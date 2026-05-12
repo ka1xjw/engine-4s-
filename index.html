@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4행정 엔진 시뮬레이션</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ffffff;
+            color: #333333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .main-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+        }
+        .controls {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 15px 0;
+        }
+        input[type="number"] {
+            font-size: 1em;
+            font-weight: bold;
+            width: 80px;
+            padding: 5px;
+            margin-left: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+            color: #333;
+        }
+        .status {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stroke-info {
+            font-size: 1.1em;
+            color: #ff9800;
+        }
+        
+        .left-panel {
+            position: absolute;
+            right: 100%;
+            margin-right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 120px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .left-panel h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            text-align: center;
+            font-size: 1.1em;
+            color: #444;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        .gear-btn {
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f5f5f5;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #444;
+            transition: all 0.2s ease;
+        }
+        .gear-btn:hover {
+            background-color: #e0e0e0;
+        }
+        .gear-btn.active {
+            background-color: #2196F3;
+            color: white;
+            border-color: #1976D2;
+        }
+
+        .right-panel {
+            position: absolute;
+            left: 100%;
+            margin-left: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 200px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .right-panel h3 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            text-align: center;
+            font-size: 1.1em;
+            color: #444;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .gauge-row {
+            display: flex;
+            flex-direction: column;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .gauge-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .gauge-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+            text-align: right;
+        }
+        #starterBtn {
+            margin-top: 15px;
+            padding: 12px 24px;
+            font-size: 1.1em;
+            font-weight: bold;
+            background-color: #ff9800;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        #starterBtn:hover {
+            background-color: #fb8c00;
+        }
+        #starterBtn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-wrapper">
+        <div class="left-panel">
+            <h3>변속기</h3>
+            <button class="gear-btn" data-gear="R">R (후진)</button>
+            <button class="gear-btn active" data-gear="N">N (중립)</button>
+            <button class="gear-btn" data-gear="1">1단</button>
+            <button class="gear-btn" data-gear="2">2단</button>
+            <button class="gear-btn" data-gear="3">3단</button>
+            <button class="gear-btn" data-gear="4">4단</button>
+            <button class="gear-btn" data-gear="5">5단</button>
+            <button class="gear-btn" data-gear="6">6단</button>
+        </div>
+
+        <canvas id="engineCanvas" width="650" height="500"></canvas>
+
+        <div class="controls">
+            <div class="status">RPM: <input type="number" id="rpmInput" min="0" max="9500" value="60"></div>
+            <div class="stroke-info">현재 행정: <span id="strokeText">엔진 정지됨</span></div>
+            <input type="range" id="rpmSlider" min="0" max="9500" value="60" step="10">
+            <button id="starterBtn">스타터 모터 (시동)</button>
+        </div>
+
+        <div class="right-panel">
+            <h3>상태 계기판</h3>
+            <div class="gauge-row">
+                <span class="gauge-label">차량 속도</span>
+                <span class="gauge-value" id="speedVal" style="color:#9c27b0;">0 km/h</span>
+            </div>
+            <div class="gauge-row">
+                <span class="gauge-label">휠 토크</span>
+                <span class="gauge-value" id="torqueVal" style="color:#e91e63;">0.0 Nm</span>
+            </div>
+            <div class="gauge-row">
+                <span class="gauge-label">엔진 온도</span>
+                <span class="gauge-value" id="engTempVal" style="color:#ff5722;">25.0 °C</span>
+            </div>
+            <div class="gauge-row">
+                <span class="gauge-label">냉각수 온도</span>
+                <span class="gauge-value" id="coolTempVal" style="color:#03a9f4;">25.0 °C</span>
+            </div>
+            <div class="gauge-row">
+                <span class="gauge-label">오일 압력</span>
+                <span class="gauge-value" id="oilPresVal" style="color:#ffc107;">0.0 bar</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('engineCanvas');
+        const ctx = canvas.getContext('2d');
+        const rpmSlider = document.getElementById('rpmSlider');
+        const rpmInput = document.getElementById('rpmInput'); 
+        const strokeTextDisplay = document.getElementById('strokeText');
+        const starterBtn = document.getElementById('starterBtn');
+
+        let engineStarted = false;
+        
+        let audioCtx;
+        let engineOsc;
+        let engineGain;
+        let engineFilter;
+
+        starterBtn.addEventListener('click', () => {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                engineOsc = audioCtx.createOscillator();
+                engineOsc.type = 'sawtooth';
+                engineFilter = audioCtx.createBiquadFilter();
+                engineFilter.type = 'lowpass';
+                engineFilter.frequency.value = 200;
+                engineGain = audioCtx.createGain();
+                engineGain.gain.value = 0;
+                
+                engineOsc.connect(engineFilter);
+                engineFilter.connect(engineGain);
+                engineGain.connect(audioCtx.destination);
+                engineOsc.start();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (!engineStarted) {
+                starterBtn.textContent = "시동 거는 중...";
+                starterBtn.disabled = true;
+
+                let startOsc = audioCtx.createOscillator();
+                let startGain = audioCtx.createGain();
+                let startFilter = audioCtx.createBiquadFilter();
+                
+                startOsc.type = 'sawtooth';
+                startFilter.type = 'lowpass';
+                startFilter.frequency.value = 400;
+
+                startOsc.frequency.setValueAtTime(60, audioCtx.currentTime);
+                startGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                
+                for(let i=0; i<4; i++) {
+                    let t = audioCtx.currentTime + i * 0.2;
+                    startOsc.frequency.linearRampToValueAtTime(100, t + 0.1);
+                    startOsc.frequency.linearRampToValueAtTime(60, t + 0.2);
+                    
+                    startGain.gain.linearRampToValueAtTime(0.5, t + 0.1);
+                    startGain.gain.linearRampToValueAtTime(0.1, t + 0.2);
+                }
+                
+                startGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.8);
+                
+                startOsc.connect(startFilter);
+                startFilter.connect(startGain);
+                startGain.connect(audioCtx.destination);
+                
+                startOsc.start();
+                startOsc.stop(audioCtx.currentTime + 0.8);
+
+                setTimeout(() => {
+                    engineStarted = true;
+                    starterBtn.textContent = "엔진 정지 (끄기)";
+                    starterBtn.style.backgroundColor = "#F44336"; 
+                    starterBtn.disabled = false;
+                }, 800);
+            } else {
+                engineStarted = false;
+                starterBtn.textContent = "스타터 모터 (시동)";
+                starterBtn.style.backgroundColor = "#ff9800"; 
+            }
+        });
+
+        let currentGear = 'N';
+        const gearBtns = document.querySelectorAll('.gear-btn');
+        gearBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                gearBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentGear = btn.getAttribute('data-gear');
+            });
+        });
+
+        rpmSlider.addEventListener('input', () => {
+            rpmInput.value = rpmSlider.value;
+        });
+        rpmInput.addEventListener('input', () => {
+            let val = parseInt(rpmInput.value);
+            if (val < 0) val = 0;
+            if (val > 9500) val = 9500;
+            rpmSlider.value = val || 0;
+        });
+
+        const crankRadius = 60; 
+        const rodLength = 200;  
+        const cylinderX = 325;  
+        const crankY = 400; 
+        const cylinderWidth = 90;
+        const pistonHeight = 50;
+
+        let crankAngle = 0; 
+        let lastTime = 0;
+        
+        let engineTemp = 25.0;
+        let coolantTemp = 25.0;
+        let oilPressure = 0.0;
+        let coolingFanOn = false; 
+
+        function drawEngine() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const rad = crankAngle;
+            const pinX = cylinderX + crankRadius * Math.sin(rad);
+            const pinY = crankY - crankRadius * Math.cos(rad);
+            
+            const dx = pinX - cylinderX;
+            const pistonY = pinY - Math.sqrt(rodLength * rodLength - dx * dx);
+
+            const degrees = (crankAngle * 180 / Math.PI) % 720;
+            let strokeName = engineStarted ? "" : "엔진 정지됨";
+            let gasColor = "#f5f5f5"; 
+            
+            let intakeLift = 0;
+            let exhaustLift = 0;
+
+            if (engineStarted) {
+                if (degrees < 180) {
+                    strokeName = "1. 흡입 (Intake)";
+                    // 원래 색상인 시원한 파란색
+                    gasColor = `rgba(135, 206, 235, ${degrees/180})`; 
+                    intakeLift = Math.sin((degrees / 180) * Math.PI) * 12; 
+                } else if (degrees < 360) {
+                    strokeName = "2. 압축 (Compression)";
+                    // 파란색에서 압축되면서 짙은 빨간색으로 온도 상승 시각화
+                    const compProgress = (degrees - 180) / 180;
+                    const r = 135 + (200 - 135) * compProgress; // 빨간색 강화
+                    const g = 206 + (0 - 206) * compProgress; 
+                    const b = 235 + (0 - 235) * compProgress;
+                    gasColor = `rgba(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)}, 0.8)`; 
+                } else if (degrees < 540) {
+                    strokeName = "3. 폭발 (Power)";
+                    const intensity = 1 - (degrees - 360) / 180;
+                    gasColor = `rgba(255, 69, 0, ${intensity})`; 
+                    
+                    if (degrees > 360 && degrees < 390) {
+                        drawSpark(cylinderX, 95); 
+                    }
+                } else {
+                    strokeName = "4. 배기 (Exhaust)";
+                    gasColor = `rgba(169, 169, 169, ${(720-degrees)/180})`; 
+                    exhaustLift = Math.sin(((degrees - 540) / 180) * Math.PI) * 12; 
+                }
+            }
+
+            strokeTextDisplay.textContent = strokeName;
+
+            const radX = 50;
+            const radY = 120;
+            const radW = 60;
+            const radH = 220;
+            const currentRpm = engineStarted ? (parseFloat(rpmSlider.value) || 0) : 0;
+            
+            const pipeTopY = 155;
+            const pipeBottomY = 290;
+
+            ctx.lineWidth = 12;
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = "#ef5350"; 
+            ctx.beginPath();
+            ctx.moveTo(radX + radW, pipeTopY);
+            ctx.lineTo(cylinderX - cylinderWidth/2 - 25, pipeTopY);
+            ctx.stroke();
+
+            ctx.strokeStyle = "#42a5f5"; 
+            ctx.beginPath();
+            ctx.moveTo(radX + radW, pipeBottomY);
+            ctx.lineTo(cylinderX - cylinderWidth/2 - 25, pipeBottomY);
+            ctx.stroke();
+
+            const isCirculating = typeof coolingFanOn !== 'undefined' && coolingFanOn;
+            if (isCirculating && engineStarted) {
+                const dashOffset = -Date.now() / 15;
+                ctx.setLineDash([15, 15]);
+                ctx.lineDashOffset = dashOffset;
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                
+                ctx.beginPath();
+                ctx.moveTo(radX + radW, pipeTopY);
+                ctx.lineTo(cylinderX - cylinderWidth/2 - 25, pipeTopY);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(cylinderX - cylinderWidth/2 - 25, pipeBottomY);
+                ctx.lineTo(radX + radW, pipeBottomY);
+                ctx.stroke();
+
+                ctx.setLineDash([]); 
+            }
+
+            ctx.fillStyle = "#37474f";
+            ctx.fillRect(radX, radY, radW, radH);
+            ctx.strokeStyle = "#263238";
+            ctx.lineWidth = 4;
+            ctx.strokeRect(radX, radY, radW, radH);
+            
+            ctx.strokeStyle = "#546e7a";
+            ctx.lineWidth = 2;
+            for (let i = radY + 10; i < radY + radH; i += 8) {
+                ctx.beginPath();
+                ctx.moveTo(radX + 5, i);
+                ctx.lineTo(radX + radW - 5, i);
+                ctx.stroke();
+            }
+            ctx.fillStyle = "#78909c";
+            ctx.fillRect(radX + 15, radY - 10, 30, 10);
+
+            ctx.beginPath();
+            const topRAngle = Math.atan2(-95, 45);
+            const topLAngle = Math.atan2(-95, -45);
+            ctx.arc(cylinderX, crankY, 105, topRAngle, topLAngle);
+            ctx.fillStyle = "#eceff1";
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#888";
+            ctx.stroke();
+
+            ctx.beginPath();
+            const oilAngle = 0.6; 
+            ctx.arc(cylinderX, crankY, 103, oilAngle, Math.PI - oilAngle);
+            ctx.closePath();
+            ctx.fillStyle = currentRpm > 0 ? "rgba(218, 165, 32, 0.8)" : "rgba(200, 140, 20, 0.9)"; 
+            ctx.fill();
+
+            ctx.fillStyle = "rgba(41, 182, 246, 0.4)"; 
+            ctx.strokeStyle = "#888";
+            ctx.lineWidth = 3;
+            
+            ctx.fillRect(cylinderX + cylinderWidth/2, 140, 25, 165);
+            ctx.strokeRect(cylinderX + cylinderWidth/2, 140, 25, 165);
+
+            ctx.fillRect(cylinderX - cylinderWidth/2 - 25, 140, 25, 165);
+            ctx.beginPath();
+            ctx.moveTo(cylinderX - cylinderWidth/2 - 25, 140);
+            ctx.lineTo(cylinderX - cylinderWidth/2 - 25, pipeTopY - 6);
+            ctx.moveTo(cylinderX - cylinderWidth/2 - 25, pipeTopY + 6);
+            ctx.lineTo(cylinderX - cylinderWidth/2 - 25, pipeBottomY - 6);
+            ctx.moveTo(cylinderX - cylinderWidth/2 - 25, pipeBottomY + 6);
+            ctx.lineTo(cylinderX - cylinderWidth/2 - 25, 305);
+            ctx.lineTo(cylinderX - cylinderWidth/2, 305);
+            ctx.lineTo(cylinderX - cylinderWidth/2, 140);
+            ctx.lineTo(cylinderX - cylinderWidth/2 - 25, 140);
+            ctx.stroke();
+
+            // 실린더 내부 배경 가스
+            ctx.fillStyle = gasColor;
+            ctx.beginPath();
+            ctx.arc(cylinderX, 130, cylinderWidth/2, Math.PI, 0); 
+            ctx.lineTo(cylinderX + cylinderWidth/2, pistonY);
+            ctx.lineTo(cylinderX - cylinderWidth/2, pistonY);
+            ctx.closePath();
+            ctx.fill();
+
+            if (engineStarted && degrees > 360 && degrees < 450) {
+                const progress = (degrees - 360) / 90;
+                const expRadius = 15 + progress * 45;
+                const alpha = 1 - progress;
+                
+                ctx.beginPath();
+                ctx.arc(cylinderX, 105 + progress * 20, expRadius, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(255, 152, 0, ${alpha})`;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(cylinderX, 105 + progress * 20, expRadius * 0.6, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(255, 235, 59, ${alpha})`;
+                ctx.fill();
+            }
+
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#888"; 
+            
+            ctx.beginPath();
+            ctx.moveTo(cylinderX - cylinderWidth/2, 305);
+            ctx.lineTo(cylinderX - cylinderWidth/2, 130);
+            ctx.arc(cylinderX, 130, cylinderWidth/2, Math.PI, Math.PI * 1.25, false);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(cylinderX, 130, cylinderWidth/2, Math.PI * 1.40, Math.PI * 1.60, false);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(cylinderX, 130, cylinderWidth/2, Math.PI * 1.75, Math.PI * 2, false);
+            ctx.lineTo(cylinderX + cylinderWidth/2, 305);
+            ctx.stroke();
+
+            ctx.fillStyle = "#eceff1"; 
+            ctx.fillRect(cylinderX - cylinderWidth/2 + 2, pistonY, cylinderWidth - 4, 305 - pistonY);
+
+            ctx.save();
+            ctx.translate(cylinderX - 22.5, 91);
+            ctx.rotate(-Math.PI/6);
+            
+            ctx.beginPath();
+            ctx.moveTo(-16, 0);
+            ctx.lineTo(-16, -90);
+            ctx.lineTo(16, -90);
+            ctx.lineTo(16, 0);
+            ctx.fillStyle = "#eceff1";
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(-16, 0);
+            ctx.lineTo(-16, -90);
+            ctx.moveTo(16, 0);
+            ctx.lineTo(16, -90);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#888";
+            ctx.stroke();
+
+            const throttlePercent = currentRpm / 9500;
+            const throttleAngleLocal = (Math.PI / 18) + throttlePercent * (Math.PI / 2 - Math.PI / 18);
+            
+            ctx.save();
+            ctx.translate(0, -60); 
+            ctx.rotate(throttleAngleLocal);
+            ctx.fillStyle = "#ffb300"; 
+            ctx.fillRect(-14, -2, 28, 4);
+            ctx.fillStyle = "#333";
+            ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(cylinderX + 22.5, 91);
+            ctx.rotate(Math.PI/6);
+            
+            ctx.beginPath();
+            ctx.moveTo(-16, 0);
+            ctx.lineTo(-16, -90);
+            ctx.lineTo(16, -90);
+            ctx.lineTo(16, 0);
+            ctx.fillStyle = "#d7ccc8"; 
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(-16, 0);
+            ctx.lineTo(-16, -90);
+            ctx.moveTo(16, 0);
+            ctx.lineTo(16, -90);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#888";
+            ctx.stroke();
+            ctx.restore();
+
+            drawValve(cylinderX - 22.5, 91, -Math.PI/6, intakeLift, "#4CAF50"); 
+            drawValve(cylinderX + 22.5, 91, Math.PI/6, exhaustLift, "#F44336"); 
+
+            const camAngleIntake = (crankAngle / 2) - Math.PI/4;
+            const camAngleExhaust = (crankAngle / 2) + Math.PI/4;
+
+            function drawCam(cx, cy, angle, baseRotation) {
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(baseRotation + angle); 
+                
+                ctx.fillStyle = "#78909c";
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, Math.PI, 0); 
+                ctx.bezierCurveTo(8, 12, 4, 18, 0, 20); 
+                ctx.bezierCurveTo(-4, 18, -8, 12, -8, 0);
+                ctx.fill();
+                
+                ctx.fillStyle = "#263238";
+                ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI*2); ctx.fill(); 
+                ctx.restore();
+            }
+
+            drawCam(cylinderX - 38.5, 63.3, camAngleIntake, -Math.PI/6); 
+            drawCam(cylinderX + 38.5, 63.3, camAngleExhaust, Math.PI/6); 
+
+            ctx.fillStyle = "#bbb";
+            ctx.fillRect(cylinderX - 5, 75, 10, 20);
+            ctx.fillStyle = "#333";
+            ctx.fillRect(cylinderX - 2, 90, 4, 8);
+
+            ctx.fillStyle = "#888";
+            ctx.beginPath();
+            ctx.moveTo(cylinderX - cylinderWidth/2 + 2, pistonY);
+            ctx.lineTo(cylinderX + cylinderWidth/2 - 2, pistonY);
+            ctx.lineTo(cylinderX + cylinderWidth/2 - 2, pistonY + pistonHeight);
+            ctx.lineTo(cylinderX + cylinderWidth/2 - 12, pistonY + pistonHeight);
+            ctx.lineTo(cylinderX + cylinderWidth/2 - 12, pistonY + 30);
+            ctx.lineTo(cylinderX - cylinderWidth/2 + 12, pistonY + 30);
+            ctx.lineTo(cylinderX - cylinderWidth/2 + 12, pistonY + pistonHeight);
+            ctx.lineTo(cylinderX - cylinderWidth/2 + 2, pistonY + pistonHeight);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#222";
+            ctx.fillRect(cylinderX - cylinderWidth/2 + 2, pistonY + 6, cylinderWidth - 4, 3);
+            ctx.fillRect(cylinderX - cylinderWidth/2 + 2, pistonY + 14, cylinderWidth - 4, 3);
+            ctx.fillRect(cylinderX - cylinderWidth/2 + 2, pistonY + 22, cylinderWidth - 4, 3);
+            
+            ctx.save();
+            const rodStartX = cylinderX;
+            const rodStartY = pistonY + pistonHeight - 10;
+            const rodAngle = Math.atan2(pinY - rodStartY, pinX - rodStartX);
+            const rodDist = Math.sqrt(Math.pow(pinX - rodStartX, 2) + Math.pow(pinY - rodStartY, 2));
+            
+            ctx.translate(rodStartX, rodStartY);
+            ctx.rotate(rodAngle);
+            
+            ctx.fillStyle = "#90a4ae";
+            ctx.strokeStyle = "#455a64";
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(0, -14);
+            ctx.lineTo(rodDist, -18);
+            ctx.arc(rodDist, 0, 18, -Math.PI/2, Math.PI/2);
+            ctx.lineTo(0, 14);
+            ctx.arc(0, 0, 14, Math.PI/2, -Math.PI/2);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = "#546e7a";
+            ctx.fillRect(16, -7, rodDist - 32, 14);
+            
+            ctx.fillStyle = "#cfd8dc";
+            ctx.beginPath(); ctx.arc(rodDist, -12, 3.5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(rodDist, 12, 3.5, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(cylinderX, crankY);
+            ctx.rotate(rad);
+            
+            ctx.fillStyle = "#546e7a";
+            ctx.strokeStyle = "#263238";
+            ctx.lineWidth = 3;
+            ctx.lineJoin = "round";
+
+            const cwRadius = crankRadius + 28; 
+            
+            ctx.beginPath();
+            ctx.arc(0, -crankRadius, 20, Math.PI, 0); 
+            ctx.bezierCurveTo(16, -crankRadius/2, 28, 0, Math.cos(0.2) * cwRadius, Math.sin(0.2) * cwRadius);
+            ctx.arc(0, 0, cwRadius, 0.2, Math.PI - 0.2);
+            ctx.bezierCurveTo(-28, 0, -16, -crankRadius/2, -20, -crankRadius);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#455a64";
+            ctx.beginPath();
+            ctx.arc(0, 0, cwRadius - 12, 0.4, Math.PI - 0.4);
+            ctx.arc(0, 10, cwRadius - 30, Math.PI - 0.5, 0.5, true);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(0, 0, 26, 0, Math.PI*2);
+            ctx.fillStyle = "#78909c";
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+
+            ctx.fillStyle = "#cfd8dc"; 
+            ctx.beginPath(); ctx.arc(cylinderX, crankY, 14, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(pinX, pinY, 12, 0, Math.PI*2); ctx.fill(); 
+            ctx.fillStyle = "#263238"; 
+            ctx.beginPath(); ctx.arc(cylinderX, crankY, 6, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(pinX, pinY, 6, 0, Math.PI*2); ctx.fill(); 
+            ctx.beginPath(); ctx.arc(cylinderX, pistonY + pistonHeight - 10, 6, 0, Math.PI*2); ctx.fill(); 
+        }
+
+        function drawValve(x, y, angle, lift, color) {
+            const valveDrop = lift; 
+            
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle); 
+            
+            ctx.strokeStyle = "#a0a0a0";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            let springTop = -36;
+            let springBottom = valveDrop - 18;
+            let coils = 6;
+            let coilHeight = (springBottom - springTop) / coils;
+            
+            ctx.moveTo(-6, springTop);
+            for(let i=1; i<=coils; i++) {
+                let side = (i % 2 === 0) ? -6 : 6;
+                ctx.lineTo(side, springTop + i * coilHeight);
+            }
+            ctx.stroke();
+
+            ctx.fillStyle = "#777";
+            ctx.fillRect(-9, valveDrop - 20, 18, 4);
+            
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(-2, valveDrop - 20);
+            ctx.lineTo(2, valveDrop - 20);
+            ctx.lineTo(2, valveDrop - 8);
+            ctx.quadraticCurveTo(2, valveDrop, 14, valveDrop + 2);
+            ctx.lineTo(-14, valveDrop + 2);
+            ctx.quadraticCurveTo(-2, valveDrop, -2, valveDrop - 8);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function drawSpark(x, y) {
+            ctx.strokeStyle = "#ff9800"; 
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - 10, y + 10);
+            ctx.lineTo(x + 5, y + 15);
+            ctx.lineTo(x - 5, y + 25);
+            ctx.stroke();
+        }
+
+        function animate(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+
+            let rpm = engineStarted ? (parseFloat(rpmSlider.value) || 0) : 0;
+
+            if (typeof audioCtx !== 'undefined' && engineStarted) {
+                if (rpm > 0) {
+                    let vol = 0.05 + (rpm / 9500) * 0.15;
+                    engineGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.1);
+                    // 엔진 소리를 토크 곡선과 비슷한 주파수 비율로 조절하여 고RPM 질감 강화
+                    let baseFreq = 40 + (rpm / 12000) * 200;
+                    engineOsc.frequency.setTargetAtTime(baseFreq, audioCtx.currentTime, 0.1);
+                    engineFilter.frequency.setTargetAtTime(200 + (rpm/9500)*800, audioCtx.currentTime, 0.1);
+                } else {
+                    engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+                }
+            } else if (typeof audioCtx !== 'undefined' && !engineStarted) {
+                engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+            }
+
+            if (engineTemp >= 94.0) coolingFanOn = true;
+            if (engineTemp <= 80.0) coolingFanOn = false;
+
+            let targetOilP = rpm > 0 ? 1.5 + (rpm / 9500) * 4.0 : 0; 
+            let targetEngT = rpm > 0 ? 85 + (rpm / 9500) * 35 : 25; 
+            let targetCoolT = rpm > 0 ? 80 + (rpm / 9500) * 25 : 25; 
+            
+            if (coolingFanOn && rpm > 0) {
+                targetEngT = 75; 
+                targetCoolT = 70;
+            }
+            
+            const thermalRate = 0.005; 
+            engineTemp += (targetEngT - engineTemp) * thermalRate;
+            coolantTemp += (targetCoolT - coolantTemp) * thermalRate;
+            oilPressure += (targetOilP - oilPressure) * 0.1; 
+
+            if (engineTemp > 95.0) engineTemp = 95.0;
+            if (coolantTemp > 95.0) coolantTemp = 95.0;
+
+            let gearRatio = 0;
+            if (currentGear === '1') gearRatio = 3.5;
+            else if (currentGear === '2') gearRatio = 2.0;
+            else if (currentGear === '3') gearRatio = 1.4;
+            else if (currentGear === '4') gearRatio = 1.0;
+            else if (currentGear === '5') gearRatio = 0.8;
+            else if (currentGear === '6') gearRatio = 0.6;
+            else if (currentGear === 'R') gearRatio = 3.5;
+
+            let speed = 0;
+            let wheelTorque = 0;
+
+            if (engineStarted && rpm > 0) {
+                if (currentGear !== 'N') {
+                    speed = (rpm / gearRatio) * 0.02; 
+                }
+                
+                let engTorque = 50 + 300 * Math.sin(Math.PI * (rpm / 12000));
+                
+                if (currentGear !== 'N') {
+                    wheelTorque = engTorque * gearRatio * 4.0;
+                }
+            }
+            
+            document.getElementById('speedVal').textContent = speed.toFixed(0) + " km/h";
+            document.getElementById('torqueVal').textContent = wheelTorque.toFixed(1) + " Nm";
+            document.getElementById('engTempVal').textContent = engineTemp.toFixed(1) + " °C";
+            document.getElementById('coolTempVal').textContent = coolantTemp.toFixed(1) + " °C";
+            document.getElementById('oilPresVal').textContent = oilPressure.toFixed(1) + " bar";
+
+            if (rpm > 0) {
+                const rps = rpm / 60;
+                const radiansPerSecond = rps * 2 * Math.PI;
+                let deltaAngle = radiansPerSecond * (deltaTime / 1000);
+                
+                const maxVisualDelta = Math.PI * 0.8; 
+                if (deltaAngle > maxVisualDelta) {
+                    deltaAngle = maxVisualDelta;
+                }
+                
+                crankAngle += deltaAngle;
+
+                if (crankAngle >= 4 * Math.PI) {
+                    crankAngle %= (4 * Math.PI);
+                }
+            }
+
+            drawEngine();
+            
+            requestAnimationFrame(animate);
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
